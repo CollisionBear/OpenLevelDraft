@@ -1,6 +1,6 @@
 {
 	"name": "com.collisionbear.openleveldraft",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Open Level Draft is a Unity Editor Extension, made to quickly block out test levels in your scenes.",
 	"displayName": "Open Level Draft",
 	"unity": "2021.3",
