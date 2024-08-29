@@ -7,15 +7,15 @@ namespace CollisionBear.OpenLevelDraft
     [CustomEditor(typeof(LevelSystem))]
     public class LevelSystemEditor : Editor
     {
-        [MenuItem("GameObject/3D Object/River System #P")]
+        [MenuItem("GameObject/3D Object/Level #P")]
         public static void CreateRiverSystem()
         {
-            var riverGameObject = new GameObject("RiverSystem");
-            riverGameObject.transform.position = GetMiddleOfViewPort();
-            var riverSystem = riverGameObject.AddComponent<LevelSystem>();
-            riverSystem.Material = Resources.Load<Material>("Prototype2Units");
-            riverSystem.IsEditable = true;
-            Selection.activeGameObject = riverGameObject;
+            var levelGameObject = new GameObject("Level System");
+            levelGameObject.transform.position = GetMiddleOfViewPort();
+            var levelSystem = levelGameObject.AddComponent<LevelSystem>();
+            levelSystem.Material = Resources.Load<Material>("Prototype2Units");
+            levelSystem.IsEditable = true;
+            Selection.activeGameObject = levelGameObject;
         }
 
         private static Vector3 GetMiddleOfViewPort()
