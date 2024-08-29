@@ -1,7 +1,7 @@
 {
-    "name": "CollisionBear.PreviewField.Editor",
+    "name": "CollisionBear.OpenLevelDraft.Editor",
     "references": [
-        "CollisionBear.PreviewField"
+        "CollisionBear.OpenLevelDraft"
     ],
     "includePlatforms": [
         "Editor"
