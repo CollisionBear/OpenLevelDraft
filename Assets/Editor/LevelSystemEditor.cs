@@ -194,7 +194,6 @@ namespace CollisionBear.OpenLevelDraft
             controlPoint.Position = Handles.DoPositionHandle(position, controlPoint.Direction) - river.transform.position;
             controlPoint.Position.y = 0;
             controlPoint.Direction = Handles.Disc(controlPoint.Direction, position, Vector3.up, 2, false, 0);
-            //controlPoint.Width = Mathf.Clamp(Handles.ScaleSlider(controlPoint.Width, position, controlPoint.Direction * Vector3.left, controlPoint.Direction, controlPoint.Width, 0), 0.2f, float.MaxValue);
             Handles.DrawLine(position + controlPoint.Direction * Vector3.left * controlPoint.Width, position);
             Handles.DrawLine(position + controlPoint.Direction * Vector3.right * controlPoint.Width, position);
             if (EditorGUI.EndChangeCheck()) {
@@ -206,7 +205,7 @@ namespace CollisionBear.OpenLevelDraft
 
         private InWorldPosition GetInWorldPoint(Vector2 position, LevelSystem river)
         {
-            if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(position), out RaycastHit raycastHit)) {
+            if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(position), out RaycastHit raycastHit, float.MaxValue, int.MaxValue, QueryTriggerInteraction.Ignore)) {
                 if (raycastHit.collider.gameObject == river.gameObject) {
                     return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInRiver = true, ControlPoints = GetSelectedControlPoint(raycastHit, river) };
                 } else {
