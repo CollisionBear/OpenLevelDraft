@@ -1,6 +1,7 @@
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using static CollisionBear.OpenLevelDraft.LevelSystem;
 
 namespace CollisionBear.OpenLevelDraft
 {
@@ -162,18 +163,16 @@ namespace CollisionBear.OpenLevelDraft
 
             var inWorldPosition = GetInWorldPoint(currentEvent.mousePosition, levelSystem);
 
-            if(inWorldPosition.ControlPoints == null) {
-                return;
-            }
-
             if (currentEvent.control) {
                 var lastPoint = levelSystem.ControlPoints.Last();
                 var lastPointPosition = levelSystem.transform.position + lastPoint.Position;
 
                 if (inWorldPosition.IsInSystem) {
                     if (currentEvent.type == EventType.MouseDown) {
-                        Undo.RecordObject(levelSystem, "Inserted control point");
-                        levelSystem.InsertControlPoint(inWorldPosition.ControlPoints, inWorldPosition.Position);
+                        if (inWorldPosition.ControlPoints != null) {
+                            Undo.RecordObject(levelSystem, "Inserted control point");
+                            levelSystem.InsertControlPoint(inWorldPosition.ControlPoints, inWorldPosition.Position);
+                        }
                         currentEvent.Use();
                     }
                 } else {
@@ -187,8 +186,10 @@ namespace CollisionBear.OpenLevelDraft
                 }
             } else if (currentEvent.shift) {
                 if (currentEvent.type == EventType.MouseDown) {
-                    Undo.RecordObject(levelSystem, "Removed control point");
-                    levelSystem.RemoveControlPoint(inWorldPosition.ControlPoints.First);
+                    if (inWorldPosition.ControlPoints != null) {
+                        Undo.RecordObject(levelSystem, "Removed control point");
+                        levelSystem.RemoveControlPoint(inWorldPosition.ControlPoints.First);
+                    }
                     currentEvent.Use();
                 }
 
@@ -209,14 +210,22 @@ namespace CollisionBear.OpenLevelDraft
         private void DrawCurvedLine(LevelSystem levelSystem)
         {
             foreach (var pair in levelSystem.GetControlPointPairs(levelSystem.ControlPoints)) {
-                var distance = (pair.Second.Position - pair.First.Position).magnitude / 3;
-                var firstPoint = pair.First.Position + levelSystem.transform.position;
-                var lastPoint = pair.Second.Position + levelSystem.transform.position;
-                var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * distance + levelSystem.transform.position;
-                var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * distance + levelSystem.transform.position;
-
-                Handles.DrawBezier(firstPoint, lastPoint, extraPosition01, extraPosition02, Color.green, null, 2);
+                ShowBezierSegment(levelSystem, pair);
             }
+
+            if (levelSystem.SplineCapMode == LevelSystem.SplineCapModeType.Closed) {
+                ShowBezierSegment(levelSystem, new ControlPointPair(levelSystem.ControlPoints.Last(), levelSystem.ControlPoints.First()));
+            }
+        }
+
+        private void ShowBezierSegment(LevelSystem levelSystem, ControlPointPair pair) {
+            var distance = (pair.Second.Position - pair.First.Position).magnitude / 3;
+            var firstPoint = pair.First.Position + levelSystem.transform.position;
+            var lastPoint = pair.Second.Position + levelSystem.transform.position;
+            var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * distance + levelSystem.transform.position;
+            var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * distance + levelSystem.transform.position;
+
+            Handles.DrawBezier(firstPoint, lastPoint, extraPosition01, extraPosition02, Color.green, null, 2);
         }
 
         private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river)
