@@ -14,7 +14,8 @@ namespace CollisionBear.OpenLevelDraft
             levelGameObject.transform.position = GetMiddleOfViewPort();
             var levelSystem = levelGameObject.AddComponent<LevelSystem>();
             levelSystem.Material = Resources.Load<Material>("Prototype2Units");
-            levelSystem.IsEditable = true;
+            levelSystem.Tool = LevelSystem.SplineToolType.Edit;
+
             Selection.activeGameObject = levelGameObject;
         }
 
@@ -35,32 +36,69 @@ namespace CollisionBear.OpenLevelDraft
         {
             public Vector3 Position;
             public bool IsInWorld;
-            public bool IsInRiver;
+            public bool IsInSystem;
             public LevelSystem.ControlPointPair ControlPoints;
         }
 
-        private readonly RaycastHit[] RaycastHits = new RaycastHit[128];
         private GUIStyle EditorTextStyle;
 
         public override void OnInspectorGUI()
         {
-            var river = target as LevelSystem;
-            EditorGUI.BeginChangeCheck();
-            river.Material = EditorGUILayout.ObjectField("Material", river.Material, typeof(Material), false) as Material;
-            river.UvScale = EditorGUILayout.FloatField("UV Scale", river.UvScale);
-            river.SmoothingLevel = Mathf.Clamp(EditorGUILayout.IntField("Smoothing Level", river.SmoothingLevel), 0, 10);
-            EditorGUILayout.Space();
+            var levelSystem = target as LevelSystem;
 
-            river.IsEditable = GUILayout.Toggle(river.IsEditable, "Edit path\t(E)", "Button", GUILayout.Height(24));
+            using (var scope = new EditorGUI.ChangeCheckScope()) {
 
-            var currentEvent = Event.current;
-            if(currentEvent.type == EventType.KeyDown && currentEvent.keyCode == KeyCode.Space) {
-                river.IsEditable = true;
-            }
+                levelSystem.Width = Mathf.Clamp(EditorGUILayout.FloatField("Width", levelSystem.Width), 0, 10);
+                levelSystem.Height = Mathf.Clamp(EditorGUILayout.FloatField("Height", levelSystem.Height), 0, 10);
 
-            if (EditorGUI.EndChangeCheck()) {
-                Undo.RecordObject(river, "Edited River Material");
-                river.UpdateRiverMesh();
+                EditorGUILayout.Space();
+
+                levelSystem.Material = EditorGUILayout.ObjectField("Material", levelSystem.Material, typeof(Material), false) as Material;
+                levelSystem.UvScale = EditorGUILayout.FloatField("UV Scale", levelSystem.UvScale);
+                levelSystem.SmoothingLevel = Mathf.Clamp(EditorGUILayout.IntField("Smoothing Level", levelSystem.SmoothingLevel), 0, 10);
+
+                EditorGUILayout.Space();
+
+                if (levelSystem.SplineCapMode == LevelSystem.SplineCapModeType.Open) {
+                    if (GUILayout.Button("Close spline")) {
+                        levelSystem.SplineCapMode = LevelSystem.SplineCapModeType.Closed;
+                        levelSystem.UpdateMesh();
+                        return;
+                    }
+                } else if (levelSystem.SplineCapMode == LevelSystem.SplineCapModeType.Closed) {
+                    if (GUILayout.Button("Open spline")) {
+                        levelSystem.SplineCapMode = LevelSystem.SplineCapModeType.Open;
+                        levelSystem.UpdateMesh();
+                        return;
+                    }
+                }
+
+                EditorGUILayout.Space();
+
+                using (new EditorGUILayout.HorizontalScope()) {
+                    using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.Edit)) {
+                        if (GUILayout.Button("Edit path\t(E)", GUILayout.Height(24))) {
+                            levelSystem.Tool = LevelSystem.SplineToolType.Edit;
+                        }
+                    }
+
+                    using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.Split)) {
+                        if (GUILayout.Button("Split path\t(R)", GUILayout.Height(24))) {
+                            levelSystem.Tool = LevelSystem.SplineToolType.Split;
+                        }
+                    }
+
+                    using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.None)) {
+                        if (GUILayout.Button("Cancel\t(Escape)", GUILayout.Height(24))) {
+                            levelSystem.Tool = LevelSystem.SplineToolType.None;
+                        }
+                    }
+                }
+
+                if (scope.changed) {
+                    Undo.RecordObject(levelSystem, "Updated Level System");
+                    levelSystem.UpdateMesh();
+                }
             }
         }
 
@@ -78,8 +116,6 @@ namespace CollisionBear.OpenLevelDraft
             if (river == null) {
                 return;
             }
-
-            river.IsEditable = Selection.activeGameObject == river.gameObject;
         }
 
         public void OnSceneView(SceneView sceneView)
@@ -93,55 +129,66 @@ namespace CollisionBear.OpenLevelDraft
                 fontSize = 12
             };
 
-            var river = target as LevelSystem;
-            if(river == null) {
+            var levelSystem = target as LevelSystem;
+            if(levelSystem == null) {
                 return;
             }
 
             var currentEvent = Event.current;
 
-            if (!river.IsEditable) {
+            if (levelSystem.Tool == LevelSystem.SplineToolType.None) {
                 if (currentEvent.type == EventType.KeyDown && currentEvent.keyCode == KeyCode.E) {
-                    river.IsEditable = true;
+                    levelSystem.Tool = LevelSystem.SplineToolType.Edit;
                     currentEvent.Use();
                 }
 
                 return;
             }
 
+            if (levelSystem.Tool == LevelSystem.SplineToolType.Edit) {
+                HandleEditMode(levelSystem, sceneView, currentEvent);
+            }
+        }
+
+        private void HandleEditMode(LevelSystem levelSystem, SceneView sceneView, Event currentEvent) {
+
             HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
-            foreach (var point in river.ControlPoints) {
-                ShowControlPoint(point, river);
+            foreach (var point in levelSystem.ControlPoints) {
+                ShowControlPoint(point, levelSystem);
             }
 
-            DrawCurvedLine(river);
+            DrawCurvedLine(levelSystem);
 
-            var inWorldPosition = GetInWorldPoint(currentEvent.mousePosition, river);
+            var inWorldPosition = GetInWorldPoint(currentEvent.mousePosition, levelSystem);
+
+            if(inWorldPosition.ControlPoints == null) {
+                return;
+            }
 
             if (currentEvent.control) {
-                var lastPoint = river.ControlPoints.Last();
-                var lastPointPosition = river.transform.position + lastPoint.Position;
+                var lastPoint = levelSystem.ControlPoints.Last();
+                var lastPointPosition = levelSystem.transform.position + lastPoint.Position;
 
-                if (inWorldPosition.IsInRiver) {
+                if (inWorldPosition.IsInSystem) {
                     if (currentEvent.type == EventType.MouseDown) {
-                        Undo.RecordObject(river, "Inserted control point");
-                        river.InsertControlPoint(inWorldPosition.ControlPoints, inWorldPosition.Position);
+                        Undo.RecordObject(levelSystem, "Inserted control point");
+                        levelSystem.InsertControlPoint(inWorldPosition.ControlPoints, inWorldPosition.Position);
                         currentEvent.Use();
                     }
                 } else {
                     Handles.DrawLine(lastPointPosition, inWorldPosition.Position);
 
                     if (currentEvent.type == EventType.MouseDown) {
-                        Undo.RecordObject(river, "Added additional control point");
-                        river.AddControlPoint(inWorldPosition.Position);
+                        Undo.RecordObject(levelSystem, "Added additional control point");
+                        levelSystem.AddControlPoint(inWorldPosition.Position);
                         currentEvent.Use();
                     }
                 }
             } else if (currentEvent.shift) {
                 if (currentEvent.type == EventType.MouseDown) {
-                    Undo.RecordObject(river, "Removed control point");
-                    river.RemoveControlPoint(inWorldPosition.ControlPoints.First);
+                    Undo.RecordObject(levelSystem, "Removed control point");
+                    levelSystem.RemoveControlPoint(inWorldPosition.ControlPoints.First);
                     currentEvent.Use();
                 }
 
@@ -149,57 +196,43 @@ namespace CollisionBear.OpenLevelDraft
                 Handles.Label(inWorldPosition.Position + Vector3.down * 2, "Hold control to place point\nHold shift to remove a point\nPress space to release", EditorTextStyle);
             }
 
-            if (currentEvent.type == EventType.KeyDown && (currentEvent.keyCode == KeyCode.Space || currentEvent.keyCode == KeyCode.Escape)) {
-                river.IsEditable = false;
-                currentEvent.Use();
+            if (levelSystem.Tool == LevelSystem.SplineToolType.Edit) {
+                if (currentEvent.type == EventType.KeyDown && (currentEvent.keyCode == KeyCode.Space || currentEvent.keyCode == KeyCode.Escape)) {
+                    levelSystem.Tool = LevelSystem.SplineToolType.None;
+                    currentEvent.Use();
+                }
             }
 
             sceneView.Repaint();
         }
 
-        private void DrawStraightLine(LevelSystem river)
+        private void DrawCurvedLine(LevelSystem levelSystem)
         {
-            foreach (var pair in river.GetControlPointPairs(river.ControlPoints)) {
-                Handles.DrawLine(river.transform.position + pair.First.Position, river.transform.position + pair.Second.Position);
-            }
-        }
-
-        private void DrawCurvedLine(LevelSystem river)
-        {
-            var leftRotation = Quaternion.LookRotation(Vector3.left);
-            var rightotation = Quaternion.LookRotation(Vector3.right);
-
-            foreach (var pair in river.GetControlPointPairs(river.ControlPoints)) {
+            foreach (var pair in levelSystem.GetControlPointPairs(levelSystem.ControlPoints)) {
                 var distance = (pair.Second.Position - pair.First.Position).magnitude / 3;
-                var firstPoint = pair.First.Position + river.transform.position;
-                var lastPoint = pair.Second.Position + river.transform.position;
-                var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * distance + river.transform.position;
-                var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * distance + river.transform.position;
+                var firstPoint = pair.First.Position + levelSystem.transform.position;
+                var lastPoint = pair.Second.Position + levelSystem.transform.position;
+                var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * distance + levelSystem.transform.position;
+                var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * distance + levelSystem.transform.position;
 
                 Handles.DrawBezier(firstPoint, lastPoint, extraPosition01, extraPosition02, Color.green, null, 2);
             }
         }
 
-        private float GetVelocity(float value)
-        {
-            return 0;
-        }
-
         private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river)
         {
             var position = river.transform.position + controlPoint.Position;
-            float size = HandleUtility.GetHandleSize(position) * 1f;
 
-            EditorGUI.BeginChangeCheck();
-            controlPoint.Position = Handles.DoPositionHandle(position, controlPoint.Direction) - river.transform.position;
-            controlPoint.Position.y = 0;
-            controlPoint.Direction = Handles.Disc(controlPoint.Direction, position, Vector3.up, 2, false, 0);
-            Handles.DrawLine(position + controlPoint.Direction * Vector3.left * controlPoint.Width, position);
-            Handles.DrawLine(position + controlPoint.Direction * Vector3.right * controlPoint.Width, position);
-            if (EditorGUI.EndChangeCheck()) {
-                Undo.RecordObject(river, "Edited River control point");
-                river.UpdateRiverMesh();
-                EditorUtility.SetDirty(river);
+            using (var scope = new EditorGUI.ChangeCheckScope()) {
+                controlPoint.Position = Handles.DoPositionHandle(position, controlPoint.Direction) - river.transform.position;
+                controlPoint.Position.y = 0;
+                controlPoint.Direction = Handles.Disc(controlPoint.Direction, position, Vector3.up, 3, false, 0);
+
+                if (scope.changed) {
+                    Undo.RecordObject(river, "Edited River control point");
+                    river.UpdateMesh();
+                    EditorUtility.SetDirty(river);
+                }
             }
         }
 
@@ -207,26 +240,35 @@ namespace CollisionBear.OpenLevelDraft
         {
             if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(position), out RaycastHit raycastHit, float.MaxValue, int.MaxValue, QueryTriggerInteraction.Ignore)) {
                 if (raycastHit.collider.gameObject == river.gameObject) {
-                    return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInRiver = true, ControlPoints = GetSelectedControlPoint(raycastHit, river) };
+                    return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInSystem = true, ControlPoints = GetSelectedControlPoint(raycastHit, river) };
                 } else {
-                    return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInRiver = false };
+                    return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInSystem = false };
                 }
             } else {
                 return new InWorldPosition { Position = Vector3.zero, IsInWorld = false };
             }
         }
 
-        private LevelSystem.ControlPointPair GetSelectedControlPoint(RaycastHit raycastHit, LevelSystem river)
+        private LevelSystem.ControlPointPair GetSelectedControlPoint(RaycastHit raycastHit, LevelSystem levelSystem)
         {
-            var segmentIndex = (raycastHit.triangleIndex - 4) / 6;
-            var placedSegmentIndex = Mathf.Clamp((segmentIndex + 1) / (river.SmoothingLevel + 1), 0, int.MaxValue);
-            var previousSegmentIndex = Mathf.Clamp(segmentIndex / (river.SmoothingLevel + 1), 0, int.MaxValue);
-
-            if (previousSegmentIndex == placedSegmentIndex) {
-                previousSegmentIndex = placedSegmentIndex + 1;
+            var triangleIndex = raycastHit.triangleIndex;
+            if (levelSystem.SplineCapMode == LevelSystem.SplineCapModeType.Open) {
+                triangleIndex -= 4;
             }
 
-            return new LevelSystem.ControlPointPair(river.ControlPoints[placedSegmentIndex], river.ControlPoints[previousSegmentIndex]);
+            var segmentIndex = triangleIndex / 6;
+            var placedSegmentIndex = Mathf.Clamp((segmentIndex + 1) / (levelSystem.SmoothingLevel + 1), 0, int.MaxValue);
+            var nextSegmentIndex = Mathf.Clamp(segmentIndex / (levelSystem.SmoothingLevel + 1), 0, int.MaxValue);
+
+            if (nextSegmentIndex == placedSegmentIndex) {
+                nextSegmentIndex = placedSegmentIndex + 1;
+            }
+
+            if(placedSegmentIndex < 0 || nextSegmentIndex >= levelSystem.ControlPoints.Count) {
+                return null;
+            }
+
+            return new LevelSystem.ControlPointPair(levelSystem.ControlPoints[placedSegmentIndex], levelSystem.ControlPoints[nextSegmentIndex]);
         }
     }
 }

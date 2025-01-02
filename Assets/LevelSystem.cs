@@ -14,8 +14,6 @@ namespace CollisionBear.OpenLevelDraft
         public class RiverControlPoint
         {
             public Vector3 Position;
-            public float Width = 1;
-            public float Height = 2f;
             public Quaternion Direction = Quaternion.identity;
         }
 
@@ -45,10 +43,26 @@ namespace CollisionBear.OpenLevelDraft
             public float CurrentUvOffset = 0;
         }
 
+        public enum SplineCapModeType: byte {
+            Open = 0,
+            Closed = 1
+        }
+
+        public enum SplineToolType : byte {
+            None = 0,
+            Edit = 1,
+            Split = 2
+        }
+
+        public float Width = 1f;
+        public float Height = 1f;
+        public SplineCapModeType SplineCapMode = SplineCapModeType.Open;
+
+
         public Material Material;
         public float UvScale = 0.5f;
-        public int SmoothingLevel = 4;          // Additional segments inserted between the placed control points. Increased value will cause the river bend smoother.
-        public bool IsEditable = false;         // If true, the edit path button is pressed down in the editor and control points are movable/addable/removable
+        public int SmoothingLevel = 10;          // Additional segments inserted between the placed control points. Increased value will cause the river bend smoother.
+        public SplineToolType Tool = SplineToolType.None;
 
         [HideInInspector]
         public List<RiverControlPoint> ControlPoints;
@@ -78,9 +92,9 @@ namespace CollisionBear.OpenLevelDraft
                 previous.Direction = Quaternion.Slerp(ControlPoints[ControlPoints.Count -2].Direction, direction, 0.5f);
             }
 
-            var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction, Width = lastControlPoint.Width };
+            var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction};
             ControlPoints.Add(controlPoint);
-            UpdateRiverMesh();
+            UpdateMesh();
         }
 
         public void InsertControlPoint(ControlPointPair controlPoints, Vector3 position)
@@ -89,22 +103,21 @@ namespace CollisionBear.OpenLevelDraft
             var targetPosition = position - transform.position;
 
             var direction = Quaternion.Slerp(controlPoints.First.Direction, controlPoints.Second.Direction, 0.5f);
-            var width = Mathf.Lerp(controlPoints.First.Width, controlPoints.Second.Width, 0.5f);
 
-            var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction, Width = width };
+            var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction };
 
             var insertIndex = Mathf.Max(ControlPoints.IndexOf(controlPoints.First), ControlPoints.IndexOf(controlPoints.Second));
             ControlPoints.Insert(insertIndex, controlPoint);
-            UpdateRiverMesh();
+            UpdateMesh();
         }
 
         public void RemoveControlPoint(RiverControlPoint controlPoint)
         {
             ControlPoints.Remove(controlPoint);
-            UpdateRiverMesh();
+            UpdateMesh();
         }
 
-        public void UpdateRiverMesh()
+        public void UpdateMesh()
         {
             var meshFilter = GetComponent<MeshFilter>();
             var meshRender = GetComponent<MeshRenderer>();
@@ -133,8 +146,10 @@ namespace CollisionBear.OpenLevelDraft
         {
             var result = new MeshData();
 
-            CreateStartCap(controlPoints[0], result);
-            CreateEndCap(controlPoints.Last(), result);
+            if (SplineCapMode == SplineCapModeType.Open) {
+                CreateStartCap(controlPoints[0], result);
+                CreateEndCap(controlPoints.Last(), result);
+            }
 
             AddControlPointToMesh(controlPoints[0], null, result);
             for (int i = 1; i < controlPoints.Count; i++) {
@@ -160,10 +175,11 @@ namespace CollisionBear.OpenLevelDraft
             meshData.Normals.Add(controlPoint.Direction * Vector3.back);
             meshData.Normals.Add(controlPoint.Direction * Vector3.back);
 
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 0), controlPoint.Width));
+            var scale = new Vector2(Width, Height);
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 0), scale));
 
             meshData.Uvs.Add(new Vector2(0, 0) * 2f * UvScale);
             meshData.Uvs.Add(new Vector2(0, 1) * 2f * UvScale);
@@ -185,10 +201,11 @@ namespace CollisionBear.OpenLevelDraft
             meshData.Normals.Add(Vector3.back);
             meshData.Normals.Add(Vector3.back);
 
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position,controlPoint.Direction, new Vector3(1, 0), controlPoint.Width));
+            var scale = new Vector2(Width, Height);
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position,controlPoint.Direction, new Vector3(1, 0), scale));
 
             meshData.Uvs.Add(new Vector2(1, 0) * 2f * UvScale);
             meshData.Uvs.Add(new Vector2(1, 1) * 2f * UvScale);
@@ -210,12 +227,13 @@ namespace CollisionBear.OpenLevelDraft
             meshData.CurrentLeftUvOffset += uvOffset;
             meshData.CurrentRightUvOffset += uvOffset;
 
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), controlPoint.Width));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 0), controlPoint.Width));
+            var scale = new Vector2(Width, Height);
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 0), scale));
 
             // All river segments points up regardless of actual orientation
             meshData.Normals.Add(controlPoint.Direction * Vector3.left);
@@ -226,11 +244,11 @@ namespace CollisionBear.OpenLevelDraft
             meshData.Normals.Add(controlPoint.Direction * Vector3.right);
 
             // Make the X axis a continuous point along the edge and the y axis continuous along the middle. Makes it looks smoother
-            meshData.Uvs.Add(new Vector2(meshData.CurrentLeftUvOffset, controlPoint.Width * 2) * UvScale);
+            meshData.Uvs.Add(new Vector2(meshData.CurrentLeftUvOffset, Width * 2) * UvScale);
             meshData.Uvs.Add(new Vector2(meshData.CurrentRightUvOffset, 0) * UvScale);
-            meshData.Uvs.Add(new Vector2(meshData.CurrentLeftUvOffset, controlPoint.Width * 2) * UvScale);
+            meshData.Uvs.Add(new Vector2(meshData.CurrentLeftUvOffset, Width * 2) * UvScale);
             meshData.Uvs.Add(new Vector2(meshData.CurrentRightUvOffset, 0) * UvScale);
-            meshData.Uvs.Add(new Vector2(meshData.CurrentLeftUvOffset, controlPoint.Width * 2) * UvScale);
+            meshData.Uvs.Add(new Vector2(meshData.CurrentLeftUvOffset, Width * 2) * UvScale);
             meshData.Uvs.Add(new Vector2(meshData.CurrentRightUvOffset, 0) * UvScale);
 
             var indicesPerSegment = 6;
@@ -261,33 +279,46 @@ namespace CollisionBear.OpenLevelDraft
             }
 
             foreach (var pair in GetControlPointPairs(controlPoints)) {
+                result.AddRange(GenereateStepPoints(pair, steps));
+            }
 
-                var pairHalfDistance = (pair.Second.Position - pair.First.Position).magnitude / 4;
-                var pairStepDistance = 1f / (steps + 1);
-
-                var firstPoint = pair.First.Position;
-                var lastPoint = pair.Second.Position;
-                var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * pairHalfDistance;
-                var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * pairHalfDistance;
-
-                for (int i = 0; i < steps; i++) {
-                    var distanceFactor = (i + 1) * pairStepDistance;
-                    var position = BezierCurves.CubicCurve(firstPoint, extraPosition01, extraPosition02, lastPoint, distanceFactor);
-                    var tangent = BezierCurves.CubicCurveDerivative(firstPoint, extraPosition01, extraPosition02, lastPoint, distanceFactor).normalized;
-                    var width = Mathf.Lerp(pair.First.Width, pair.Second.Width, distanceFactor);
-
-                    result.Add(new RiverControlPoint { Position = position, Direction = Quaternion.LookRotation(tangent), Width = width });
-                }
-
-                result.Add(pair.Second);
+            if(SplineCapMode == SplineCapModeType.Closed) {
+                result.AddRange(GenereateStepPoints(new ControlPointPair(controlPoints.Last(), controlPoints.First()), steps));
             }
 
             return result;
         }
 
-        private Vector3 GetVectorPosition(Vector3 position, Quaternion rotation, Vector3 direction, float width)
+        private List<RiverControlPoint> GenereateStepPoints(ControlPointPair pair, int steps) {
+            var result = new List<RiverControlPoint>();
+
+            var pairHalfDistance = (pair.Second.Position - pair.First.Position).magnitude / 4;
+            var pairStepDistance = 1f / (steps + 1);
+
+            var firstPoint = pair.First.Position;
+            var lastPoint = pair.Second.Position;
+            var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * pairHalfDistance;
+            var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * pairHalfDistance;
+
+            for (int i = 0; i < steps; i++) {
+                var distanceFactor = (i + 1) * pairStepDistance;
+                var position = BezierCurves.CubicCurve(firstPoint, extraPosition01, extraPosition02, lastPoint, distanceFactor);
+                var tangent = BezierCurves.CubicCurveDerivative(firstPoint, extraPosition01, extraPosition02, lastPoint, distanceFactor).normalized;
+
+                result.Add(new RiverControlPoint { Position = position, Direction = Quaternion.LookRotation(tangent) });
+            }
+
+            result.Add(pair.Second);
+
+            return result;
+        }
+
+        private Vector3 GetVectorPosition(Vector3 position, Quaternion rotation, Vector3 direction, Vector2 scale)
         {
-            return position + rotation * direction * width;
+            var offset = direction;
+            offset.x *= scale.x;
+            offset.y *= scale.y;
+            return position + rotation * offset;
         }
 
         public List<ControlPointPair> GetControlPointPairs(List<LevelSystem.RiverControlPoint> controlPoints)
