@@ -43,6 +43,7 @@ namespace CollisionBear.OpenLevelDraft
             public bool IsInWorld;
             public bool IsInSystem;
             public LevelSystem.ControlPointPair ControlPoints;
+            public float PositionFactor;
         }
 
         private GUIStyle EditorTextStyle;
@@ -324,9 +325,18 @@ namespace CollisionBear.OpenLevelDraft
         private InWorldPosition GetInWorldPoint(Vector2 position, LevelSystem river) {
             if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(position), out RaycastHit raycastHit, float.MaxValue, int.MaxValue, QueryTriggerInteraction.Ignore)) {
                 if (raycastHit.collider.gameObject == river.gameObject) {
-                    return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInSystem = true, ControlPoints = GetSelectedControlPoint(raycastHit, river) };
+                    return new InWorldPosition {
+                        Position = raycastHit.point,
+                        IsInWorld = true,
+                        IsInSystem = true,
+                        ControlPoints = GetSelectedControlPoint(raycastHit, river)
+                    };
                 } else {
-                    return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInSystem = false };
+                    return new InWorldPosition {
+                        Position = raycastHit.point,
+                        IsInWorld = true,
+                        IsInSystem = false
+                    };
                 }
             } else {
                 return new InWorldPosition { Position = Vector3.zero, IsInWorld = false };
