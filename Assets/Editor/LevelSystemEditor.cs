@@ -3,7 +3,6 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using static CollisionBear.OpenLevelDraft.LevelSystem;
-using static UnityEditorInternal.VersionControl.ListControl;
 
 namespace CollisionBear.OpenLevelDraft
 {
@@ -15,8 +14,11 @@ namespace CollisionBear.OpenLevelDraft
         {
             var levelGameObject = new GameObject("Level System");
             levelGameObject.transform.position = GetMiddleOfViewPort();
+
+            var meshRenderer = levelGameObject.AddComponent<MeshRenderer>();
+            meshRenderer.material = Resources.Load<Material>("Prototype2Units");
+
             var levelSystem = levelGameObject.AddComponent<LevelSystem>();
-            levelSystem.Material = Resources.Load<Material>("Prototype2Units");
             levelSystem.Tool = LevelSystem.SplineToolType.Edit;
 
             Selection.activeGameObject = levelGameObject;
@@ -56,9 +58,12 @@ namespace CollisionBear.OpenLevelDraft
 
                 EditorGUILayout.Space();
 
-                levelSystem.Material = EditorGUILayout.ObjectField("Material", levelSystem.Material, typeof(Material), false) as Material;
                 levelSystem.UvScale = EditorGUILayout.FloatField("UV Scale", levelSystem.UvScale);
                 levelSystem.SmoothingLevel = Mathf.Clamp(EditorGUILayout.IntField("Smoothing Level", levelSystem.SmoothingLevel), 0, 10);
+
+                EditorGUILayout.Space();
+
+                levelSystem.Options = (LevelSystem.ControlPointOptions)EditorGUILayout.EnumFlagsField("Options", levelSystem.Options);
 
                 EditorGUILayout.Space();
 
@@ -85,11 +90,12 @@ namespace CollisionBear.OpenLevelDraft
                         }
                     }
 
-                    using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.Split)) {
-                        if (GUILayout.Button("Split path\t(R)", GUILayout.Height(24))) {
-                            levelSystem.Tool = LevelSystem.SplineToolType.Split;
-                        }
-                    }
+                    // TODO: Reenable at some later point
+                    //using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.Split)) {
+                    //    if (GUILayout.Button("Split path\t(R)", GUILayout.Height(24))) {
+                    //        levelSystem.Tool = LevelSystem.SplineToolType.Split;
+                    //    }
+                    //}
 
                     using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.None)) {
                         if (GUILayout.Button("Cancel\t(Escape)", GUILayout.Height(24))) {
@@ -302,7 +308,8 @@ namespace CollisionBear.OpenLevelDraft
             var position = river.transform.position + controlPoint.Position;
 
             using (var scope = new EditorGUI.ChangeCheckScope()) {
-                controlPoint.Position = Handles.DoPositionHandle(position, controlPoint.Direction) - river.transform.position;
+
+                controlPoint.Position = Handles.PositionHandle(position, controlPoint.Direction) - river.transform.position;
                 controlPoint.Position.y = 0;
                 controlPoint.Direction = Handles.Disc(controlPoint.Direction, position, Vector3.up, 3, false, 0);
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -56,12 +57,17 @@ namespace CollisionBear.OpenLevelDraft
             Split = 2
         }
 
+        [Flags]
+        public enum ControlPointOptions : byte {
+            LockHeight = 1
+        }
+
         public float Width = 1f;
         public float Height = 1f;
         public SplineCapModeType SplineCapMode = SplineCapModeType.Open;
 
+        public ControlPointOptions Options = 0;
 
-        public Material Material;
         public float UvScale = 0.5f;
         public int SmoothingLevel = 10;          // Additional segments inserted between the placed control points. Increased value will cause the river bend smoother.
         public SplineToolType Tool = SplineToolType.None;
@@ -84,7 +90,10 @@ namespace CollisionBear.OpenLevelDraft
             var direction = Quaternion.LookRotation(directionOffset);
 
             var targetPosition = position - transform.position;
-            targetPosition.y = lastControlPoint.Position.y;
+
+            if (Options.HasFlag(ControlPointOptions.LockHeight)) {
+                targetPosition.y = lastControlPoint.Position.y;
+            }
 
             // If first, line them up straight
             if (ControlPoints.Count == 1) {
@@ -102,6 +111,10 @@ namespace CollisionBear.OpenLevelDraft
         public void InsertControlPoint(ControlPointPair controlPoints, Vector3 position)
         {
             var targetPosition = position - transform.position;
+
+            if (Options.HasFlag(ControlPointOptions.LockHeight)) {
+                targetPosition.y = controlPoints.First.Position.y;
+            }
 
             var direction = Quaternion.Slerp(controlPoints.First.Direction, controlPoints.Second.Direction, 0.5f);
 
@@ -130,7 +143,7 @@ namespace CollisionBear.OpenLevelDraft
         public void UpdateMesh()
         {
             var meshFilter = GetComponent<MeshFilter>();
-            var meshRender = GetComponent<MeshRenderer>();
+
             var meshCollider = GetComponent<MeshCollider>();
 
             var roundedControlPoints = GenerateRiverControlPoints(ControlPoints, SmoothingLevel);
@@ -144,7 +157,6 @@ namespace CollisionBear.OpenLevelDraft
             };
 
             meshFilter.mesh = mesh;
-            meshRender.material = Material;
             meshCollider.sharedMesh = null;         // If this step is not taken, Unity might not update the mesh for the collider so it behaves as it had none
 
             if (mesh.vertexCount > 0) {
