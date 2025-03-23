@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using static CollisionBear.OpenLevelDraft.LevelSystem;
+using static UnityEditorInternal.VersionControl.ListControl;
 
 namespace CollisionBear.OpenLevelDraft
 {
@@ -146,17 +148,17 @@ namespace CollisionBear.OpenLevelDraft
                 return;
             }
 
-            if (levelSystem.Tool == LevelSystem.SplineToolType.Edit) {
-                HandleEditMode(levelSystem, sceneView, currentEvent);
-            }
+            HandleTools(levelSystem, sceneView, currentEvent);
         }
 
-        private void HandleEditMode(LevelSystem levelSystem, SceneView sceneView, Event currentEvent) {
+        private void HandleTools(LevelSystem levelSystem, SceneView sceneView, Event currentEvent) {
 
             HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
-
-            foreach (var point in levelSystem.ControlPoints) {
-                ShowControlPoint(point, levelSystem);
+            
+            if(levelSystem.Tool == SplineToolType.Edit) {
+                foreach (var point in levelSystem.ControlPoints) {
+                    ShowControlPoint(point, levelSystem);
+                }
             }
 
             DrawCurvedLine(levelSystem);
@@ -169,18 +171,22 @@ namespace CollisionBear.OpenLevelDraft
 
                 if (inWorldPosition.IsInSystem) {
                     if (currentEvent.type == EventType.MouseDown) {
-                        if (inWorldPosition.ControlPoints != null) {
-                            Undo.RecordObject(levelSystem, "Inserted control point");
-                            levelSystem.InsertControlPoint(inWorldPosition.ControlPoints, inWorldPosition.Position);
+                        if (levelSystem.Tool == SplineToolType.Edit) {
+                            HandleEditInsert(levelSystem, inWorldPosition);
+                        } else if (levelSystem.Tool == SplineToolType.Split) {
+                            HandleSplit(levelSystem, inWorldPosition);
                         }
+
                         currentEvent.Use();
                     }
                 } else {
                     Handles.DrawLine(lastPointPosition, inWorldPosition.Position);
 
                     if (currentEvent.type == EventType.MouseDown) {
-                        Undo.RecordObject(levelSystem, "Added additional control point");
-                        levelSystem.AddControlPoint(inWorldPosition.Position);
+                        if (levelSystem.Tool == SplineToolType.Edit) {
+                            HandleEditAdd(levelSystem, inWorldPosition);
+                        }
+
                         currentEvent.Use();
                     }
                 }
@@ -207,13 +213,77 @@ namespace CollisionBear.OpenLevelDraft
             sceneView.Repaint();
         }
 
+        private void HandleEditInsert(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+            if (inWorldPosition.ControlPoints == null) {
+                return;
+            }
+
+            Undo.RecordObject(levelSystem, "Inserted control point");
+            levelSystem.InsertControlPoint(inWorldPosition.ControlPoints, inWorldPosition.Position);
+        }
+
+        private void HandleSplit(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+            if (inWorldPosition.ControlPoints == null) {
+                return;
+            }
+
+            if(levelSystem.SplineCapMode == SplineCapModeType.Closed) {
+                SplitClosedLoop(levelSystem, inWorldPosition);
+            } else if (levelSystem.SplineCapMode == SplineCapModeType.Open) {
+                SplitOpenLoop(levelSystem, inWorldPosition);
+            }
+
+            levelSystem.Tool = SplineToolType.Edit;
+        }
+
+        private void SplitClosedLoop(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+            var newControlPoints = new List<RiverControlPoint>();
+
+            var firstHalf = GetListSection(levelSystem.ControlPoints, inWorldPosition.ControlPoints.Second, levelSystem.ControlPoints.Last());
+            var secondHalf = GetListSection(levelSystem.ControlPoints, levelSystem.ControlPoints.First(), inWorldPosition.ControlPoints.First);
+            var segmentDirection = (inWorldPosition.ControlPoints.Second.Position - inWorldPosition.ControlPoints.First.Position).normalized;
+
+            //newControlPoints.Insert(0, new RiverControlPoint { Position = inWorldPosition.Position - segmentDirection * 0.05f, Direction =Quaternion.LookRotation(segmentDirection) });
+            //newControlPoints.Append(new RiverControlPoint { Position = inWorldPosition.Position + segmentDirection * 0.05f, Direction = Quaternion.LookRotation(segmentDirection) });
+
+            levelSystem.SplineCapMode = SplineCapModeType.Open;
+            levelSystem.ControlPoints = newControlPoints;
+            levelSystem.UpdateMesh();
+        }
+
+        private List<RiverControlPoint> GetListSection(List<RiverControlPoint> list, RiverControlPoint start, RiverControlPoint end) {
+            var result = new List<RiverControlPoint>();
+
+            var currentIndex = list.IndexOf(start);
+
+            while(list[currentIndex] != end && currentIndex < list.Count) {
+                result.Add(list[currentIndex]);
+                currentIndex++;
+            }
+
+            return result;
+        }
+
+        private void SplitOpenLoop(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+
+        }
+
+        private void HandleEditAdd(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+            if (inWorldPosition.ControlPoints != null) {
+                return;
+            }
+
+            Undo.RecordObject(levelSystem, "Added additional control point");
+            levelSystem.AddControlPoint(inWorldPosition.Position);
+        }
+
         private void DrawCurvedLine(LevelSystem levelSystem)
         {
             foreach (var pair in levelSystem.GetControlPointPairs(levelSystem.ControlPoints)) {
                 ShowBezierSegment(levelSystem, pair);
             }
 
-            if (levelSystem.SplineCapMode == LevelSystem.SplineCapModeType.Closed) {
+            if (levelSystem.SplineCapMode == SplineCapModeType.Closed) {
                 ShowBezierSegment(levelSystem, new ControlPointPair(levelSystem.ControlPoints.Last(), levelSystem.ControlPoints.First()));
             }
         }
@@ -228,8 +298,7 @@ namespace CollisionBear.OpenLevelDraft
             Handles.DrawBezier(firstPoint, lastPoint, extraPosition01, extraPosition02, Color.green, null, 2);
         }
 
-        private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river)
-        {
+        private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river) {
             var position = river.transform.position + controlPoint.Position;
 
             using (var scope = new EditorGUI.ChangeCheckScope()) {
@@ -245,8 +314,7 @@ namespace CollisionBear.OpenLevelDraft
             }
         }
 
-        private InWorldPosition GetInWorldPoint(Vector2 position, LevelSystem river)
-        {
+        private InWorldPosition GetInWorldPoint(Vector2 position, LevelSystem river) {
             if (Physics.Raycast(HandleUtility.GUIPointToWorldRay(position), out RaycastHit raycastHit, float.MaxValue, int.MaxValue, QueryTriggerInteraction.Ignore)) {
                 if (raycastHit.collider.gameObject == river.gameObject) {
                     return new InWorldPosition { Position = raycastHit.point, IsInWorld = true, IsInSystem = true, ControlPoints = GetSelectedControlPoint(raycastHit, river) };
@@ -258,8 +326,7 @@ namespace CollisionBear.OpenLevelDraft
             }
         }
 
-        private LevelSystem.ControlPointPair GetSelectedControlPoint(RaycastHit raycastHit, LevelSystem levelSystem)
-        {
+        private ControlPointPair GetSelectedControlPoint(RaycastHit raycastHit, LevelSystem levelSystem) {
             var triangleIndex = raycastHit.triangleIndex;
             if (levelSystem.SplineCapMode == LevelSystem.SplineCapModeType.Open) {
                 triangleIndex -= 4;
@@ -270,14 +337,14 @@ namespace CollisionBear.OpenLevelDraft
             var nextSegmentIndex = Mathf.Clamp(segmentIndex / (levelSystem.SmoothingLevel + 1), 0, int.MaxValue);
 
             if (nextSegmentIndex == placedSegmentIndex) {
-                nextSegmentIndex = placedSegmentIndex + 1;
+                nextSegmentIndex = (int)Mathf.Repeat(placedSegmentIndex + 1, levelSystem.ControlPoints.Count);
             }
 
-            if(placedSegmentIndex < 0 || nextSegmentIndex >= levelSystem.ControlPoints.Count) {
+            if(placedSegmentIndex < 0 || placedSegmentIndex >= levelSystem.ControlPoints.Count || nextSegmentIndex < 0 || nextSegmentIndex >= levelSystem.ControlPoints.Count) {
                 return null;
             }
 
-            return new LevelSystem.ControlPointPair(levelSystem.ControlPoints[placedSegmentIndex], levelSystem.ControlPoints[nextSegmentIndex]);
+            return new ControlPointPair(levelSystem.ControlPoints[placedSegmentIndex], levelSystem.ControlPoints[nextSegmentIndex]);
         }
     }
 }

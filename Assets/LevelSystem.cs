@@ -15,6 +15,8 @@ namespace CollisionBear.OpenLevelDraft
         {
             public Vector3 Position;
             public Quaternion Direction = Quaternion.identity;
+
+            public override string ToString() => Position.ToString();
         }
 
         public class ControlPointPair
@@ -99,15 +101,23 @@ namespace CollisionBear.OpenLevelDraft
 
         public void InsertControlPoint(ControlPointPair controlPoints, Vector3 position)
         {
-
             var targetPosition = position - transform.position;
 
             var direction = Quaternion.Slerp(controlPoints.First.Direction, controlPoints.Second.Direction, 0.5f);
 
             var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction };
 
-            var insertIndex = Mathf.Max(ControlPoints.IndexOf(controlPoints.First), ControlPoints.IndexOf(controlPoints.Second));
-            ControlPoints.Insert(insertIndex, controlPoint);
+            var firstIndex = ControlPoints.IndexOf(controlPoints.First);
+            var secondIndex = ControlPoints.IndexOf(controlPoints.Second);
+
+            var insertIndex = Mathf.Max(firstIndex, secondIndex);
+
+            if (controlPoints.Second == ControlPoints.First()) {
+                // Closed loop, in between last and first control point
+                ControlPoints.Add(controlPoint);
+            } else {
+                ControlPoints.Insert(insertIndex, controlPoint);
+            }
             UpdateMesh();
         }
 
