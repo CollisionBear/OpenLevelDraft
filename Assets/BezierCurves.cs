@@ -1,4 +1,5 @@
 using UnityEngine;
+using static CollisionBear.OpenLevelDraft.LevelSystem;
 
 namespace CollisionBear.OpenLevelDraft
 {
@@ -23,6 +24,8 @@ namespace CollisionBear.OpenLevelDraft
                 2f * t * (p2 - p1);
         }
 
+        public static Vector3 CubicCurve(BezierPosition position, float t) => CubicCurve(position.Start, position.StartTangent, position.EndTangent, position.End, t);
+
         public static Vector3 CubicCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
         {
             t = Mathf.Clamp01(t);
@@ -33,6 +36,8 @@ namespace CollisionBear.OpenLevelDraft
                 3f * oneMinusT * t * t * p2 +
                 t * t * t * p3;
         }
+
+        public static Vector3 CubicCurveDerivative(BezierPosition position, float t) => CubicCurveDerivative(position.Start, position.StartTangent, position.EndTangent, position.End, t);
 
         public static Vector3 CubicCurveDerivative(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
         {

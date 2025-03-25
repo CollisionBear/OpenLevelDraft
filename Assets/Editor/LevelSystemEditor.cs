@@ -7,21 +7,28 @@ using static CollisionBear.OpenLevelDraft.LevelSystem;
 namespace CollisionBear.OpenLevelDraft
 {
     [CustomEditor(typeof(LevelSystem))]
-    public class LevelSystemEditor : Editor
-    {
+    public class LevelSystemEditor : Editor {
+        private const float SplitGap = 0.5f;
+
         [MenuItem("GameObject/3D Object/Level #P")]
         public static void CreateRiverSystem()
         {
-            var levelGameObject = new GameObject("Level System");
-            levelGameObject.transform.position = GetMiddleOfViewPort();
+            var position = GetMiddleOfViewPort();
+            var levelSystem = CreateLevelSystem(position);
+            levelSystem.Tool = LevelSystem.SplineToolType.Edit;
 
+            Selection.activeGameObject = levelSystem.gameObject;
+        }
+
+        private static LevelSystem CreateLevelSystem(Vector3 position) {
+            var levelGameObject = new GameObject("Level System");
+
+            levelGameObject.transform.position = position;
             var meshRenderer = levelGameObject.AddComponent<MeshRenderer>();
             meshRenderer.material = Resources.Load<Material>("Prototype2Units");
 
-            var levelSystem = levelGameObject.AddComponent<LevelSystem>();
-            levelSystem.Tool = LevelSystem.SplineToolType.Edit;
-
-            Selection.activeGameObject = levelGameObject;
+            var result = levelGameObject.AddComponent<LevelSystem>();
+            return result;
         }
 
         private static Vector3 GetMiddleOfViewPort()
@@ -91,12 +98,11 @@ namespace CollisionBear.OpenLevelDraft
                         }
                     }
 
-                    // TODO: Reenable at some later point
-                    //using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.Split)) {
-                    //    if (GUILayout.Button("Split path\t(R)", GUILayout.Height(24))) {
-                    //        levelSystem.Tool = LevelSystem.SplineToolType.Split;
-                    //    }
-                    //}
+                    using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.Split)) {
+                        if (GUILayout.Button("Split path", GUILayout.Height(24))) {
+                            levelSystem.Tool = LevelSystem.SplineToolType.Split;
+                        }
+                    }
 
                     using (new EditorGUI.DisabledGroupScope(levelSystem.Tool == LevelSystem.SplineToolType.None)) {
                         if (GUILayout.Button("Cancel\t(Escape)", GUILayout.Height(24))) {
@@ -167,8 +173,6 @@ namespace CollisionBear.OpenLevelDraft
                     ShowControlPoint(point, levelSystem);
                 }
             }
-
-            DrawCurvedLine(levelSystem);
 
             var inWorldPosition = GetInWorldPoint(currentEvent.mousePosition, levelSystem);
 
@@ -272,7 +276,37 @@ namespace CollisionBear.OpenLevelDraft
         }
 
         private void SplitOpenLoop(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+            inWorldPosition.Position.y = inWorldPosition.ControlPoints.First.Position.y;
 
+            var firstLevelSystemPoints = GetControlPointsBetween(levelSystem, levelSystem.ControlPoints.First(), inWorldPosition.ControlPoints.First);
+            var secondLevelSystemPoints = GetControlPointsBetween(levelSystem, inWorldPosition.ControlPoints.Second, levelSystem.ControlPoints.Last());
+
+            var position = BezierCurves.CubicCurve(inWorldPosition.ControlPoints.GetBezierValues(), 0.5f);
+            var direction = inWorldPosition.ControlPoints.Direction();
+            firstLevelSystemPoints.Add(new RiverControlPoint { Position = position - direction * SplitGap, Direction = Quaternion.LookRotation(direction) });
+            secondLevelSystemPoints.Insert(0, new RiverControlPoint { Position = position + direction * SplitGap, Direction = Quaternion.LookRotation(direction) });
+
+            levelSystem.ControlPoints = firstLevelSystemPoints;
+            levelSystem.UpdateMesh();
+
+            var secondLevelSystem = CreateLevelSystem(levelSystem.transform.position);
+            secondLevelSystem.ControlPoints = secondLevelSystemPoints;
+            secondLevelSystem.UpdateMesh();
+        }
+
+        private List<RiverControlPoint> GetControlPointsBetween(LevelSystem levelSystem, RiverControlPoint start, RiverControlPoint end) {
+            var result = new List<RiverControlPoint>();
+
+            var currentIndex = levelSystem.ControlPoints.IndexOf(start);
+
+            while (levelSystem.ControlPoints[currentIndex] != end && currentIndex < levelSystem.ControlPoints.Count) {
+                result.Add(levelSystem.ControlPoints[currentIndex]);
+                currentIndex++;
+            }
+
+            result.Add(levelSystem.ControlPoints[currentIndex]);
+
+            return result;
         }
 
         private void HandleEditAdd(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
@@ -282,27 +316,6 @@ namespace CollisionBear.OpenLevelDraft
 
             Undo.RecordObject(levelSystem, "Added additional control point");
             levelSystem.AddControlPoint(inWorldPosition.Position);
-        }
-
-        private void DrawCurvedLine(LevelSystem levelSystem)
-        {
-            foreach (var pair in levelSystem.GetControlPointPairs(levelSystem.ControlPoints)) {
-                ShowBezierSegment(levelSystem, pair);
-            }
-
-            if (levelSystem.SplineCapMode == SplineCapModeType.Closed) {
-                ShowBezierSegment(levelSystem, new ControlPointPair(levelSystem.ControlPoints.Last(), levelSystem.ControlPoints.First()));
-            }
-        }
-
-        private void ShowBezierSegment(LevelSystem levelSystem, ControlPointPair pair) {
-            var distance = (pair.Second.Position - pair.First.Position).magnitude / 3;
-            var firstPoint = pair.First.Position + levelSystem.transform.position;
-            var lastPoint = pair.Second.Position + levelSystem.transform.position;
-            var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * distance + levelSystem.transform.position;
-            var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * distance + levelSystem.transform.position;
-
-            Handles.DrawBezier(firstPoint, lastPoint, extraPosition01, extraPosition02, Color.green, null, 2);
         }
 
         private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river) {

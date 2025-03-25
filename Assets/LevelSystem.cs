@@ -11,13 +11,21 @@ namespace CollisionBear.OpenLevelDraft
     public class LevelSystem : MonoBehaviour
     {
         // Each point in the spline system
-        [System.Serializable]
+        [Serializable]
         public class RiverControlPoint
         {
+            public int Index;
             public Vector3 Position;
             public Quaternion Direction = Quaternion.identity;
 
             public override string ToString() => Position.ToString();
+        }
+
+        public class BezierPosition {
+            public Vector3 Start;
+            public Vector3 StartTangent;
+            public Vector3 EndTangent;
+            public Vector3 End;
         }
 
         public class ControlPointPair
@@ -29,6 +37,22 @@ namespace CollisionBear.OpenLevelDraft
             {
                 First = first;
                 Second = second;
+            }
+
+            public Vector3 Middle() => Vector3.Lerp(Second.Position, First.Position, 0.5f);
+            public Vector3 Direction() => (Second.Position - First.Position).normalized;
+
+            public BezierPosition GetBezierValues() {
+                var result = new BezierPosition();
+
+                var pairHalfDistance = (Second.Position - First.Position).magnitude / 4;
+
+                result.Start = First.Position;
+                result.StartTangent = First.Position + First.Direction * Vector3.forward * pairHalfDistance;
+                result.EndTangent = Second.Position + Second.Direction * Vector3.back * pairHalfDistance;
+                result.End = Second.Position;
+
+                return result;
             }
         }
 
@@ -314,18 +338,13 @@ namespace CollisionBear.OpenLevelDraft
         private List<RiverControlPoint> GenereateStepPoints(ControlPointPair pair, int steps) {
             var result = new List<RiverControlPoint>();
 
-            var pairHalfDistance = (pair.Second.Position - pair.First.Position).magnitude / 4;
             var pairStepDistance = 1f / (steps + 1);
-
-            var firstPoint = pair.First.Position;
-            var lastPoint = pair.Second.Position;
-            var extraPosition01 = pair.First.Position + pair.First.Direction * Vector3.forward * pairHalfDistance;
-            var extraPosition02 = pair.Second.Position + pair.Second.Direction * Vector3.back * pairHalfDistance;
+            var bezierPosition = pair.GetBezierValues();
 
             for (int i = 0; i < steps; i++) {
                 var distanceFactor = (i + 1) * pairStepDistance;
-                var position = BezierCurves.CubicCurve(firstPoint, extraPosition01, extraPosition02, lastPoint, distanceFactor);
-                var tangent = BezierCurves.CubicCurveDerivative(firstPoint, extraPosition01, extraPosition02, lastPoint, distanceFactor).normalized;
+                var position = BezierCurves.CubicCurve(bezierPosition, distanceFactor);
+                var tangent = BezierCurves.CubicCurveDerivative(bezierPosition, distanceFactor).normalized;
 
                 result.Add(new RiverControlPoint { Position = position, Direction = Quaternion.LookRotation(tangent) });
             }
