@@ -20,13 +20,16 @@ namespace CollisionBear.OpenLevelDraft
             Selection.activeGameObject = levelSystem.gameObject;
         }
 
-        private static LevelSystem CreateLevelSystem(Vector3 position) {
+        private static LevelSystem CreateLevelSystem(Vector3 position, Material material = null) {
+            if(material == null) {
+                material = Resources.Load<Material>("Prototype2Units");
+            }
+
             var levelGameObject = new GameObject("Level System");
 
             levelGameObject.transform.position = position;
             var meshRenderer = levelGameObject.AddComponent<MeshRenderer>();
-            meshRenderer.material = Resources.Load<Material>("Prototype2Units");
-
+            meshRenderer.material = material;
             var result = levelGameObject.AddComponent<LevelSystem>();
             return result;
         }
@@ -291,7 +294,7 @@ namespace CollisionBear.OpenLevelDraft
             levelSystem.ControlPoints = firstLevelSystemPoints;
             levelSystem.UpdateMesh();
 
-            var secondLevelSystem = CreateLevelSystem(levelSystem.transform.position);
+            var secondLevelSystem = CreateLevelSystem(levelSystem.transform.position, levelSystem.GetComponent<Renderer>().sharedMaterial);
             secondLevelSystem.ControlPoints = secondLevelSystemPoints;
             secondLevelSystem.UpdateMesh();
         }
