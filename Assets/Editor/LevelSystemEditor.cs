@@ -248,31 +248,33 @@ namespace CollisionBear.OpenLevelDraft
         }
 
         private void SplitClosedLoop(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
+            var position = BezierCurves.CubicCurve(inWorldPosition.ControlPoints.GetBezierValues(), 0.5f);
+            var direction = inWorldPosition.ControlPoints.Direction();
+
+            // We're trying to split between the last and first point
+            if (inWorldPosition.ControlPoints.First == levelSystem.ControlPoints.Last()) {
+                levelSystem.ControlPoints.Insert(0, new RiverControlPoint { Position = position + direction * SplitGap, Direction = Quaternion.LookRotation(direction) });
+                levelSystem.ControlPoints.Add(new RiverControlPoint { Position = position - direction * SplitGap, Direction = Quaternion.LookRotation(direction) });
+
+                levelSystem.SplineCapMode = SplineCapModeType.Open;
+                levelSystem.UpdateMesh();
+                return;
+            }
+
             var newControlPoints = new List<RiverControlPoint>();
 
-            var firstHalf = GetListSection(levelSystem.ControlPoints, inWorldPosition.ControlPoints.Second, levelSystem.ControlPoints.Last());
-            var secondHalf = GetListSection(levelSystem.ControlPoints, levelSystem.ControlPoints.First(), inWorldPosition.ControlPoints.First);
-            var segmentDirection = (inWorldPosition.ControlPoints.Second.Position - inWorldPosition.ControlPoints.First.Position).normalized;
+            var firstLevelSystemPoints = GetControlPointsBetween(levelSystem, levelSystem.ControlPoints.First(), inWorldPosition.ControlPoints.First);
+            var secondLevelSystemPoints = GetControlPointsBetween(levelSystem, inWorldPosition.ControlPoints.Second, levelSystem.ControlPoints.Last());
 
-            //newControlPoints.Insert(0, new RiverControlPoint { Position = inWorldPosition.Position - segmentDirection * 0.05f, Direction =Quaternion.LookRotation(segmentDirection) });
-            //newControlPoints.Append(new RiverControlPoint { Position = inWorldPosition.Position + segmentDirection * 0.05f, Direction = Quaternion.LookRotation(segmentDirection) });
+            newControlPoints.AddRange(secondLevelSystemPoints);
+            newControlPoints.AddRange(firstLevelSystemPoints);
+
+            newControlPoints.Insert(0, new RiverControlPoint { Position = position + direction * SplitGap, Direction = Quaternion.LookRotation(direction) });
+            newControlPoints.Add(new RiverControlPoint { Position = position - direction * SplitGap, Direction = Quaternion.LookRotation(direction) });
 
             levelSystem.SplineCapMode = SplineCapModeType.Open;
             levelSystem.ControlPoints = newControlPoints;
             levelSystem.UpdateMesh();
-        }
-
-        private List<RiverControlPoint> GetListSection(List<RiverControlPoint> list, RiverControlPoint start, RiverControlPoint end) {
-            var result = new List<RiverControlPoint>();
-
-            var currentIndex = list.IndexOf(start);
-
-            while(list[currentIndex] != end && currentIndex < list.Count) {
-                result.Add(list[currentIndex]);
-                currentIndex++;
-            }
-
-            return result;
         }
 
         private void SplitOpenLoop(LevelSystem levelSystem, InWorldPosition inWorldPosition) {
