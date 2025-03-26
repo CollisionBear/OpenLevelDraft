@@ -326,6 +326,10 @@ namespace CollisionBear.OpenLevelDraft
         private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river) {
             var position = river.transform.position + controlPoint.Position;
 
+            var adjustedPosition = river.transform.position + (river.transform.rotation * controlPoint.Position);
+            Debug.DrawLine(river.transform.position, adjustedPosition, Color.red);
+            Debug.DrawLine(river.transform.position, position, Color.green);
+
             using (var scope = new EditorGUI.ChangeCheckScope()) {
 
                 controlPoint.Position = Handles.PositionHandle(position, controlPoint.Direction) - river.transform.position;
