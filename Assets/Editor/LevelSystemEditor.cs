@@ -330,6 +330,9 @@ namespace CollisionBear.OpenLevelDraft
             Debug.DrawLine(river.transform.position, adjustedPosition, Color.red);
             Debug.DrawLine(river.transform.position, position, Color.green);
 
+            var originalPosition = adjustedPosition - (river.transform.rotation * controlPoint.Position);
+            Debug.DrawLine(adjustedPosition, originalPosition, Color.cyan);
+
             using (var scope = new EditorGUI.ChangeCheckScope()) {
 
                 controlPoint.Position = Handles.PositionHandle(position, controlPoint.Direction) - river.transform.position;
