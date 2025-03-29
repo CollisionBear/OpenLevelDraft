@@ -3,17 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-namespace CollisionBear.OpenLevelDraft
-{
+namespace CollisionBear.OpenLevelDraft {
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshRenderer))]
     [RequireComponent(typeof(MeshCollider))]
-    public class LevelSystem : MonoBehaviour
-    {
+    public class LevelSystem : MonoBehaviour {
         // Each point in the spline system
         [Serializable]
-        public class RiverControlPoint
-        {
+        public class RiverControlPoint {
             public int Index;
             public Vector3 Position;
             public Quaternion Direction = Quaternion.identity;
@@ -28,13 +25,11 @@ namespace CollisionBear.OpenLevelDraft
             public Vector3 End;
         }
 
-        public class ControlPointPair
-        {
+        public class ControlPointPair {
             public RiverControlPoint First;
             public RiverControlPoint Second;
 
-            public ControlPointPair(RiverControlPoint first, RiverControlPoint second)
-            {
+            public ControlPointPair(RiverControlPoint first, RiverControlPoint second) {
                 First = first;
                 Second = second;
             }
@@ -57,8 +52,7 @@ namespace CollisionBear.OpenLevelDraft
         }
 
         // Class to hold data while dynamically generate the mesh
-        public class MeshData
-        {
+        public class MeshData {
             public List<Vector3> Vertices = new List<Vector3>();
             public List<Vector3> Normals = new List<Vector3>();
             public List<Vector2> Uvs = new List<Vector2>();
@@ -70,7 +64,7 @@ namespace CollisionBear.OpenLevelDraft
             public float CurrentUvOffset = 0;
         }
 
-        public enum SplineCapModeType: byte {
+        public enum SplineCapModeType : byte {
             Open = 0,
             Closed = 1
         }
@@ -99,15 +93,13 @@ namespace CollisionBear.OpenLevelDraft
         [HideInInspector]
         public List<RiverControlPoint> ControlPoints;
 
-        public void Reset()
-        {
+        public void Reset() {
             ControlPoints = new List<RiverControlPoint> {
                 new RiverControlPoint{ Position = new Vector3(0f, 0f, 0f), Direction = Quaternion.LookRotation(Vector3.right) }
             };
         }
 
-        public void AddControlPoint(Vector3 position)
-        {
+        public void AddControlPoint(Vector3 position) {
             var lastControlPoint = ControlPoints.Last();
             var directionOffset = position - (transform.position + lastControlPoint.Position);
             directionOffset.y = 0;
@@ -124,16 +116,15 @@ namespace CollisionBear.OpenLevelDraft
                 ControlPoints[0].Direction = direction;
             } else if (ControlPoints.Count > 1) {
                 var previous = ControlPoints.Last();
-                previous.Direction = Quaternion.Slerp(ControlPoints[ControlPoints.Count -2].Direction, direction, 0.5f);
+                previous.Direction = Quaternion.Slerp(ControlPoints[ControlPoints.Count - 2].Direction, direction, 0.5f);
             }
 
-            var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction};
+            var controlPoint = new RiverControlPoint { Position = targetPosition, Direction = direction };
             ControlPoints.Add(controlPoint);
             UpdateMesh();
         }
 
-        public void InsertControlPoint(ControlPointPair controlPoints, Vector3 position)
-        {
+        public void InsertControlPoint(ControlPointPair controlPoints, Vector3 position) {
             var targetPosition = position - transform.position;
 
             if (Options.HasFlag(ControlPointOptions.LockHeight)) {
@@ -158,14 +149,12 @@ namespace CollisionBear.OpenLevelDraft
             UpdateMesh();
         }
 
-        public void RemoveControlPoint(RiverControlPoint controlPoint)
-        {
+        public void RemoveControlPoint(RiverControlPoint controlPoint) {
             ControlPoints.Remove(controlPoint);
             UpdateMesh();
         }
 
-        public void UpdateMesh()
-        {
+        public void UpdateMesh() {
             var meshFilter = GetComponent<MeshFilter>();
 
             var meshCollider = GetComponent<MeshCollider>();
@@ -188,8 +177,7 @@ namespace CollisionBear.OpenLevelDraft
             }
         }
 
-        private MeshData GenerateMeshData(List<RiverControlPoint> controlPoints)
-        {
+        private MeshData GenerateMeshData(List<RiverControlPoint> controlPoints) {
             var result = new MeshData();
 
             if (SplineCapMode == SplineCapModeType.Open) {
@@ -205,8 +193,7 @@ namespace CollisionBear.OpenLevelDraft
             return result;
         }
 
-        private float GetUvOffset(RiverControlPoint controlPoint, RiverControlPoint lastControlPoint)
-        {
+        private float GetUvOffset(RiverControlPoint controlPoint, RiverControlPoint lastControlPoint) {
             if (lastControlPoint == null) {
                 return 0;
             }
@@ -214,8 +201,7 @@ namespace CollisionBear.OpenLevelDraft
             return (lastControlPoint.Position - controlPoint.Position).magnitude;
         }
 
-        private void CreateStartCap(RiverControlPoint controlPoint, MeshData meshData)
-        {
+        private void CreateStartCap(RiverControlPoint controlPoint, MeshData meshData) {
             meshData.Normals.Add(controlPoint.Direction * Vector3.back);
             meshData.Normals.Add(controlPoint.Direction * Vector3.back);
             meshData.Normals.Add(controlPoint.Direction * Vector3.back);
@@ -240,8 +226,7 @@ namespace CollisionBear.OpenLevelDraft
             meshData.CurrentIndex += 4;
         }
 
-        private void CreateEndCap(RiverControlPoint controlPoint, MeshData meshData)
-        {
+        private void CreateEndCap(RiverControlPoint controlPoint, MeshData meshData) {
             meshData.Normals.Add(Vector3.back);
             meshData.Normals.Add(Vector3.back);
             meshData.Normals.Add(Vector3.back);
@@ -251,7 +236,7 @@ namespace CollisionBear.OpenLevelDraft
             meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 0), scale));
             meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(-1, 2), scale));
             meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 2), scale));
-            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position,controlPoint.Direction, new Vector3(1, 0), scale));
+            meshData.Vertices.Add(GetVectorPosition(controlPoint.Position, controlPoint.Direction, new Vector3(1, 0), scale));
 
             meshData.Uvs.Add(new Vector2(1, 0) * 2f * UvScale);
             meshData.Uvs.Add(new Vector2(1, 1) * 2f * UvScale);
@@ -266,8 +251,7 @@ namespace CollisionBear.OpenLevelDraft
             meshData.CurrentIndex += 4;
         }
 
-        private void AddControlPointToMesh(RiverControlPoint controlPoint, RiverControlPoint lastControlPoint, MeshData meshData)
-        {
+        private void AddControlPointToMesh(RiverControlPoint controlPoint, RiverControlPoint lastControlPoint, MeshData meshData) {
             var uvOffset = GetUvOffset(controlPoint, lastControlPoint);
             meshData.CurrentUvOffset += uvOffset;
             meshData.CurrentLeftUvOffset += uvOffset;
@@ -314,8 +298,7 @@ namespace CollisionBear.OpenLevelDraft
             meshData.CurrentIndex += indicesPerSegment;
         }
 
-        private List<RiverControlPoint> GenerateRiverControlPoints(List<RiverControlPoint> controlPoints, int steps)
-        {
+        private List<RiverControlPoint> GenerateRiverControlPoints(List<RiverControlPoint> controlPoints, int steps) {
             var result = new List<RiverControlPoint> {
                 controlPoints[0]
             };
@@ -328,7 +311,7 @@ namespace CollisionBear.OpenLevelDraft
                 result.AddRange(GenereateStepPoints(pair, steps));
             }
 
-            if(SplineCapMode == SplineCapModeType.Closed) {
+            if (SplineCapMode == SplineCapModeType.Closed) {
                 result.AddRange(GenereateStepPoints(new ControlPointPair(controlPoints.Last(), controlPoints.First()), steps));
             }
 
@@ -354,16 +337,14 @@ namespace CollisionBear.OpenLevelDraft
             return result;
         }
 
-        private Vector3 GetVectorPosition(Vector3 position, Quaternion rotation, Vector3 direction, Vector2 scale)
-        {
+        private Vector3 GetVectorPosition(Vector3 position, Quaternion rotation, Vector3 direction, Vector2 scale) {
             var offset = direction;
             offset.x *= scale.x;
             offset.y *= scale.y;
             return position + rotation * offset;
         }
 
-        public List<ControlPointPair> GetControlPointPairs(List<LevelSystem.RiverControlPoint> controlPoints)
-        {
+        public List<ControlPointPair> GetControlPointPairs(List<LevelSystem.RiverControlPoint> controlPoints) {
             var result = new List<ControlPointPair>();
             if (controlPoints.Count < 2) {
                 return result;

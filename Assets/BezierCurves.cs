@@ -1,14 +1,11 @@
 using UnityEngine;
 using static CollisionBear.OpenLevelDraft.LevelSystem;
 
-namespace CollisionBear.OpenLevelDraft
-{
+namespace CollisionBear.OpenLevelDraft {
     // @Diashes made me add this link
     // https://en.wikipedia.org/wiki/B%C3%A9zier_curve
-    public static class BezierCurves
-    {
-        public static Vector3 QuadraticCurve(Vector3 p0, Vector3 p1, Vector3 p2, float t)
-        {
+    public static class BezierCurves {
+        public static Vector3 QuadraticCurve(Vector3 p0, Vector3 p1, Vector3 p2, float t) {
             t = Mathf.Clamp01(t);
             float oneMinusT = 1f - t;
             return
@@ -17,8 +14,7 @@ namespace CollisionBear.OpenLevelDraft
                 t * t * p2;
         }
 
-        public static Vector3 QuadraticCurveDerivative(Vector3 p0, Vector3 p1, Vector3 p2, float t)
-        {
+        public static Vector3 QuadraticCurveDerivative(Vector3 p0, Vector3 p1, Vector3 p2, float t) {
             return
                 2f * (1f - t) * (p1 - p0) +
                 2f * t * (p2 - p1);
@@ -26,8 +22,7 @@ namespace CollisionBear.OpenLevelDraft
 
         public static Vector3 CubicCurve(BezierPosition position, float t) => CubicCurve(position.Start, position.StartTangent, position.EndTangent, position.End, t);
 
-        public static Vector3 CubicCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
-        {
+        public static Vector3 CubicCurve(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t) {
             t = Mathf.Clamp01(t);
             float oneMinusT = 1f - t;
             return
@@ -39,8 +34,7 @@ namespace CollisionBear.OpenLevelDraft
 
         public static Vector3 CubicCurveDerivative(BezierPosition position, float t) => CubicCurveDerivative(position.Start, position.StartTangent, position.EndTangent, position.End, t);
 
-        public static Vector3 CubicCurveDerivative(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
-        {
+        public static Vector3 CubicCurveDerivative(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t) {
             t = Mathf.Clamp01(t);
             float oneMinusT = 1f - t;
             return

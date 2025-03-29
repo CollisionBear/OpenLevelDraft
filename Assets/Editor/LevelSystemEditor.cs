@@ -1,3 +1,4 @@
+using System.CodeDom;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -324,20 +325,16 @@ namespace CollisionBear.OpenLevelDraft
         }
 
         private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river) {
-            var position = river.transform.position + controlPoint.Position;
-
             var adjustedPosition = river.transform.position + (river.transform.rotation * controlPoint.Position);
-            Debug.DrawLine(river.transform.position, adjustedPosition, Color.red);
-            Debug.DrawLine(river.transform.position, position, Color.green);
-
-            var originalPosition = adjustedPosition - (river.transform.rotation * controlPoint.Position);
-            Debug.DrawLine(adjustedPosition, originalPosition, Color.cyan);
-
             using (var scope = new EditorGUI.ChangeCheckScope()) {
 
-                controlPoint.Position = Handles.PositionHandle(position, controlPoint.Direction) - river.transform.position;
-                controlPoint.Position.y = 0;
-                controlPoint.Direction = Handles.Disc(controlPoint.Direction, position, Vector3.up, 3, false, 0);
+                var newPosition = Handles.PositionHandle(adjustedPosition, controlPoint.Direction);
+                controlPoint.Direction = Handles.Disc(controlPoint.Direction, adjustedPosition, Vector3.up, 3, false, 0);
+
+                var deltaPosition = newPosition - river.transform.position;
+                var controlPointPosition = Quaternion.Inverse(river.transform.rotation) * deltaPosition;
+
+                controlPoint.Position = controlPointPosition;
 
                 if (scope.changed) {
                     Undo.RecordObject(river, "Edited River control point");
