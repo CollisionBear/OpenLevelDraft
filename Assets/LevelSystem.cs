@@ -125,7 +125,7 @@ namespace CollisionBear.OpenLevelDraft {
         }
 
         public void InsertControlPoint(ControlPointPair controlPoints, Vector3 position) {
-            var targetPosition = position - transform.position;
+            var targetPosition = Vector3.Lerp(controlPoints.First.Position, controlPoints.Second.Position, 0.5f);
 
             if (Options.HasFlag(ControlPointOptions.LockHeight)) {
                 targetPosition.y = controlPoints.First.Position.y;

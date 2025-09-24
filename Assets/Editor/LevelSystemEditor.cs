@@ -17,6 +17,7 @@ namespace CollisionBear.OpenLevelDraft
             var position = GetMiddleOfViewPort();
             var levelSystem = CreateLevelSystem(position);
             levelSystem.Tool = LevelSystem.SplineToolType.Edit;
+            levelSystem.Options = ControlPointOptions.LockHeight;
 
             Selection.activeGameObject = levelSystem.gameObject;
         }
@@ -327,11 +328,14 @@ namespace CollisionBear.OpenLevelDraft
         private void ShowControlPoint(LevelSystem.RiverControlPoint controlPoint, LevelSystem river) {
             var adjustedPosition = river.transform.position + (river.transform.rotation * controlPoint.Position);
             using (var scope = new EditorGUI.ChangeCheckScope()) {
-
                 var newPosition = Handles.PositionHandle(adjustedPosition, controlPoint.Direction);
                 controlPoint.Direction = Handles.Disc(controlPoint.Direction, adjustedPosition, Vector3.up, 3, false, 0);
 
                 var deltaPosition = newPosition - river.transform.position;
+                if (river.Options.HasFlag(ControlPointOptions.LockHeight)) {
+                    deltaPosition.y = 0;
+                }
+
                 var controlPointPosition = Quaternion.Inverse(river.transform.rotation) * deltaPosition;
 
                 controlPoint.Position = controlPointPosition;
